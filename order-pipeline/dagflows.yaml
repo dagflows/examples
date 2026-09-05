@@ -1,0 +1,31 @@
+# Workspace definition registering constituent subprojects.
+# Workflow graph nodes and edges are declared directly in project code and discovered via SDK manifests.
+#
+# One workflow, six nodes, three languages:
+#
+#     ingest_orders (py)
+#       |                 \
+#       v                  v
+#     validate_orders     score_risk (node)
+#       (go)               |
+#       |                  v
+#       v                 apply_pricing (go)
+#     enrich_customers     |
+#       (node)             |
+#       |                  |
+#       +--------> build_report (py) <-------+
+#
+# Node keys are workspace-unique, allowing cross-language dependency references by string key.
+
+v: 1
+
+# Matches the owning project workflow name (py-orders), while contributing projects use unnamed workflows.
+workflow: order-pipeline
+
+projects:
+  - path: py-orders
+  - path: go-orders
+
+  # Explicit entry module for TypeScript because default inference looks for .js files.
+  - path: node-orders
+    module: app/workflow.ts

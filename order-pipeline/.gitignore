@@ -1,0 +1,19 @@
+# Emitted manifests. The platform produces these during a build, committing one
+# would be committing a build artifact that the SDK regenerates from the code.
+dagflows-manifest.json
+manifest.json
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- node ---
+# node_modules is ignored while package-lock.json is tracked for reproducible npm ci builds.
+node_modules/
+
+# --- editors and os ---
+.DS_Store
+.idea/
+.vscode/
