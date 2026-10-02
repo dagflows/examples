@@ -1,0 +1,7 @@
+# The manifest is built by the platform from the code.
+dagflows-manifest.json
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
