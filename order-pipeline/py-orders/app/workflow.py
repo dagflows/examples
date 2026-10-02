@@ -1,4 +1,4 @@
-"""Initial and terminal pipeline nodes (ingest_orders and build_report).
+"""The trigger that starts a run, and the initial and terminal nodes (ingest_orders and build_report).
 
 Owns global workflow settings for the multi-project workspace by instantiating a named Workflow.
 Secondary projects contribute nodes via unnamed workflows.
@@ -45,23 +45,18 @@ class Report:
 # --------------------------------------------------------------------------
 
 
-@wf.node()
-def ingest_orders() -> Orders:
-    """Root entrypoint node returning a reproducible test batch of orders.
+# A run starts with a batch of orders as its event. A manual run, or a webhook bound
+# to this trigger, delivers the batch, and the platform checks it against Orders first.
+orders_received = wf.trigger("orders_received", event=Orders)
 
-    Declares no dependencies or arguments since it requires neither input data nor context.
+
+@wf.node(depends=[orders_received])
+def ingest_orders(batch: Orders) -> Orders:
+    """Root node handing the delivered batch of orders to both branches.
+
+    Its one parent is the trigger, so `batch` is the event, decoded into Orders.
     """
-    return Orders(
-        orders=[
-            Order(id=1001, customer_id="cus_alpha", amount_cents=12_50, currency="usd"),
-            Order(id=1002, customer_id="cus_beta", amount_cents=340_00, currency="USD"),
-            Order(id=1003, customer_id="cus_gamma", amount_cents=99_99, currency="usd"),
-            # Rejected downstream by validate_orders: currency is not usd.
-            Order(id=1004, customer_id="cus_delta", amount_cents=5_00, currency="eur"),
-            # Rejected downstream: an order must be worth something.
-            Order(id=1005, customer_id="cus_epsilon", amount_cents=0, currency="usd"),
-        ]
-    )
+    return batch
 
 
 # --------------------------------------------------------------------------
