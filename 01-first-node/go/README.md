@@ -1,59 +1,32 @@
-# Step 1: your first node (Go)
+# Step 1: Your First Node (Go)
 
-A workflow with one node, `ingest_orders`. It returns a batch of five orders and logs how many there are. It has no types and no trigger: you run it by hand.
+A minimal workflow with one root node (`ingest_orders`) that returns mock order data. This node is untyped, takes no trigger payload, and is invoked manually.
 
-## The files
+## Files
 
 ```
-main.go   the workflow and its one node
-go.mod    the module, requiring the Dagflows SDK
-go.sum    the SDK's checksums
+main.go   the workflow and its node handler
+go.mod    module declaration requiring the Dagflows SDK
 ```
 
-Dagflows finds the workflow without any configuration: a `go.mod` at the root makes this a
-Go project, and Dagflows builds the module root, where `package main` lives.
+Dagflows automatically discovers the project by finding `go.mod` at the root and builds the module where `package main` lives.
 
-## The code
+## Code
 
-```go
-func ingestOrders(ctx *df.Ctx, _ df.None) (map[string]any, error) {
-	orders := []map[string]any{
-		{"id": 1001, "customer_id": "cus_alpha", "amount_cents": 1250, "currency": "usd"},
-		...
-	}
+[main.go](main.go) contains the complete workflow implementation.
 
-	ctx.Log().Info("ingested orders", "run", ctx.Run().WorkflowRunID, "count", len(orders))
-	return map[string]any{"orders": orders}, nil
-}
-
-func main() {
-	wf := df.NewWorkflow("order-pipeline", df.WorkflowOptions{})
-	wf.Node(ingestOrders, df.Root, df.NodeOptions{Key: "ingest_orders"})
-	df.Main()
-}
-```
-
-- `df.NewWorkflow("order-pipeline", ...)` names the workflow. Every step of these examples builds on it.
-- A node's handler always has the shape `func(ctx *df.Ctx, in In) (Out, error)`. Here `In`
-  is `df.None`, nothing, and `Out` is `map[string]any`, plain JSON.
-- `wf.Node` registers the handler with where its input comes from, `df.Root` for a node
-  with no parents, and its key, `ingest_orders`.
-- `ctx` is the node's context. `ctx.Log()` is a `*slog.Logger` that writes to the run's
-  logs, and `ctx.Run().WorkflowRunID` is the id of the run.
-- `df.Main()` answers Dagflows: it writes the manifest when Dagflows builds the code, and
-  runs the node when Dagflows invokes it.
-
-## Run it on your machine
+## Run Locally
 
 ```bash
+# 1. Build the workflow manifest
 go run . build manifest -o dagflows-manifest.json
+
+# 2. Execute the node locally
 go run . dev run ingest_orders
 ```
 
-`build manifest` writes what Dagflows reads from your code, one node called
-`ingest_orders`. Dagflows builds the manifest itself when it deploys, so it is not
-committed. `dev run` runs the node the way Dagflows does, and prints what it logged and
-returned:
+- `build manifest`: Generates `dagflows-manifest.json`, the execution graph Dagflows uses to schedule nodes. (Dagflows builds this automatically during deployment, but running it locally lets you inspect your node metadata).
+- `dev run`: Executes the handler directly on your machine without a microVM or server, printing execution status, structured logs, and JSON output:
 
 ```
 time=2026-10-02T15:26:51.839Z level=INFO msg="ingested orders" run=local count=5
@@ -72,12 +45,12 @@ ingest_orders -> SUCCESS
   }
 ```
 
-## Run it on Dagflows
+## Run on Dagflows
 
-Copy this directory into a repository of your own, then deploy and run it as
-[Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows)
-shows. The run takes no body. When it has finished, the node's log includes this line:
+Push this directory to your repository, then deploy and trigger a run as shown in [Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows).
+
+The workflow requires no input payload. Once execution completes, the node's structured log will show:
 
 ```
-time=<when it ran> level=INFO msg="ingested orders" run=<the run's id> count=5
+time=<timestamp> level=INFO msg="ingested orders" run=<workflow_run_id> count=5
 ```

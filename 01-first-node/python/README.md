@@ -1,64 +1,45 @@
-# Step 1: your first node (Python)
+# Step 1: Your First Node (Python)
 
-A workflow with one node, `ingest_orders`. It returns a batch of five orders and logs how
-many there are. It has no types and no trigger: you run it by hand.
+A minimal workflow with one root node (`ingest_orders`) that returns mock order data. This node is untyped, takes no trigger payload, and is invoked manually.
 
-## The files
+## Files
 
 ```
-workflow.py        the workflow and its one node
-requirements.txt   the Dagflows SDK, pinned
+workflow.py        workflow definition and node handler
+requirements.txt   pinned Dagflows SDK dependency
 ```
 
-Dagflows finds the workflow without any configuration: a `requirements.txt` naming
-`dagflows` makes this a Python project, and `workflow.py` is where the workflow is looked
-for (`app/workflow.py` works too).
+Dagflows automatically discovers the project from `requirements.txt` and loads `workflow.py` (or `app/workflow.py`).
 
-## The code
+## Code
 
-```python
-wf = Workflow("order-pipeline")
+[workflow.py](workflow.py) contains the complete workflow implementation.
 
-
-@wf.node()
-def ingest_orders(ctx):
-    orders = [
-        {"id": 1001, "customer_id": "cus_alpha", "amount_cents": 1250, "currency": "usd"},
-        ...
-    ]
-
-    ctx.log.info("run %s: ingested %d orders", ctx.run.workflow_run_id, len(orders))
-    return {"orders": orders}
-```
-
-- `Workflow("order-pipeline")` names the workflow. Every step of these examples builds on it.
-- `@wf.node()` makes the function a node. Its key is the function's name, `ingest_orders`.
-- `ctx` is the node's context. `ctx.log` writes to the run's logs, and
-  `ctx.run.workflow_run_id` is the id of the run.
-- What the function returns is the node's output, plain JSON here.
-
-## Run it on your machine
+## Run Locally
 
 ```bash
 python -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# 1. Build the workflow manifest
 python -m dagflows build manifest workflow -o dagflows-manifest.json
+
+# 2. Generate a local test fixture and invoke the node
 python -m dagflows dev fixture workflow:ingest_orders -o /tmp/fixture.json
 DAGFLOWS_INPUT=/tmp/fixture.json DAGFLOWS_OUTPUT=/tmp/output.json python -m dagflows invoke --node ingest_orders
 jq . /tmp/output.json
 ```
 
-`build manifest` writes what Dagflows reads from your code, one node called
-`ingest_orders`. Dagflows builds the manifest itself when it deploys, so it is not
-committed. `dev fixture` writes the input a node receives, and `invoke` runs the node on
-it the way Dagflows does. The node logs:
+- `build manifest`: Inspects the workflow module and generates `dagflows-manifest.json` describing `ingest_orders`. (Dagflows generates this automatically during deployment, but running it locally verifies discovery).
+- `dev fixture`: Generates a mock input payload matching what Dagflows supplies to root nodes.
+- `invoke`: Runs the node handler against the fixture file, outputting structured logs and writing the result:
 
 ```
 INFO run local: ingested 5 orders
 ```
 
-and `/tmp/output.json` holds its output:
+Output in `/tmp/output.json`:
 
 ```json
 {
@@ -76,12 +57,12 @@ and `/tmp/output.json` holds its output:
 }
 ```
 
-## Run it on Dagflows
+## Run on Dagflows
 
-Copy this directory into a repository of your own, then deploy and run it as
-[Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows)
-shows. The run takes no body. When it has finished, the node's log includes this line:
+Push this directory to your repository, then deploy and trigger a run as shown in [Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows).
+
+The workflow requires no input payload. Once execution completes, the run log will show:
 
 ```
-INFO run <the run's id>: ingested 5 orders
+INFO run <workflow_run_id>: ingested 5 orders
 ```

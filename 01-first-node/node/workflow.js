@@ -1,15 +1,9 @@
-// A workflow with one node, run by hand.
-
 import { Workflow } from "@dagflows/sdk/authoring";
 
-// The workflow every step of these examples builds on.
 export const wf = new Workflow("order-pipeline");
 
-/**
- * Returns a batch of orders as plain data, and logs how many there are.
- * `ctx` is the node's context: `ctx.log` writes to the run's logs, and `ctx.run`
- * says which run this is. A node is found by its export, so it is exported.
- */
+// Node handlers must be exported so Dagflows can discover them.
+// The node key defaults to the function name unless specified in options.
 export const ingestOrders = wf.node(
   function ingestOrders({ ctx }) {
     const orders = [
@@ -20,7 +14,9 @@ export const ingestOrders = wf.node(
       { id: 1005, customer_id: "cus_epsilon", amount_cents: 0, currency: "usd" },
     ];
 
+    // ctx provides run metadata and structured logging sent to the run console.
     ctx.log.info(`run ${ctx.run.workflowRunId}: ingested ${orders.length} orders`);
+
     return { orders };
   },
   { key: "ingest_orders" },

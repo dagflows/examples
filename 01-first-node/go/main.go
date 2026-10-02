@@ -1,11 +1,9 @@
-// A workflow with one node, run by hand.
 package main
 
 import df "github.com/dagflows/sdk-go"
 
-// ingestOrders returns a batch of orders as plain data, and logs how many there are.
-// ctx is the node's context: ctx.Log() writes to the run's logs, and ctx.Run() says
-// which run this is. df.None says the node takes no input.
+// Node handlers follow the signature func(ctx *df.Ctx, in In) (Out, error).
+// Root nodes take df.None since they have no parent inputs.
 func ingestOrders(ctx *df.Ctx, _ df.None) (map[string]any, error) {
 	orders := []map[string]any{
 		{"id": 1001, "customer_id": "cus_alpha", "amount_cents": 1250, "currency": "usd"},
@@ -15,17 +13,19 @@ func ingestOrders(ctx *df.Ctx, _ df.None) (map[string]any, error) {
 		{"id": 1005, "customer_id": "cus_epsilon", "amount_cents": 0, "currency": "usd"},
 	}
 
+	// ctx.Log() is a *slog.Logger attached to the workflow run's log stream.
 	ctx.Log().Info("ingested orders", "run", ctx.Run().WorkflowRunID, "count", len(orders))
+
 	return map[string]any{"orders": orders}, nil
 }
 
 func main() {
-	// The workflow every step of these examples builds on.
 	wf := df.NewWorkflow("order-pipeline", df.WorkflowOptions{})
 
-	// df.Root makes it a node with no parents.
+	// Register ingestOrders as a root node (df.Root) with an explicit node key.
 	wf.Node(ingestOrders, df.Root, df.NodeOptions{Key: "ingest_orders"})
 
-	// Answers the platform: emits the manifest when building, runs the node when invoked.
+	// Dispatches SDK commands: dumps the workflow graph during build,
+	// and invokes the target node handler during execution.
 	df.Main()
 }
