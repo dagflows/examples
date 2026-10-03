@@ -13,6 +13,7 @@ Every step is the previous one with one idea added, so start at step 1.
 | 2. [Typed node](02-typed-node) | The node's output declared as a type | [python](02-typed-node/python) | [go](02-typed-node/go) | [node](02-typed-node/node) (TypeScript) |
 | 3. [Several nodes](03-several-nodes) | A chain of typed nodes, each fed its parent's output | [python](03-several-nodes/python) | [go](03-several-nodes/go) | [node](03-several-nodes/node) (TypeScript) |
 | 4. [Two languages](04-two-languages) | One workflow across a Python and a Go project | [workspace](04-two-languages) | [workspace](04-two-languages) | |
+| 5. [Fan-out and join](05-fan-out-and-join) | Two branches in parallel, joined in one node, across three languages | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) |
 
 [order-pipeline](order-pipeline) is where the steps lead: six nodes in three languages,
 started by a trigger.

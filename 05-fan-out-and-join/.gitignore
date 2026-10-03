@@ -1,0 +1,12 @@
+# The manifests are built by the platform from the code.
+dagflows-manifest.json
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+node_modules/
+
+# What `go build` leaves behind.
+/go-orders/order-pipeline
