@@ -1,0 +1,5 @@
+# The manifest is built by the platform from the code.
+dagflows-manifest.json
+
+# What `go build` leaves behind.
+/order-pipeline
