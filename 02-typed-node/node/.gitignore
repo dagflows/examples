@@ -1,0 +1,4 @@
+# The manifest is built by the platform from the code.
+dagflows-manifest.json
+
+node_modules/

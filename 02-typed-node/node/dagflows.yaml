@@ -1,0 +1,6 @@
+# Dagflows discovers workflow.js on its own. A TypeScript entry module is named here.
+v: 1
+
+projects:
+  - path: .
+    module: workflow.ts
