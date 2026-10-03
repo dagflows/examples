@@ -108,7 +108,7 @@ Every node of a triggered run sees the same trigger, in any language:
 - `kind`: `manual` for a run started as shown below, `webhook` for a webhook, `cron` for a schedule and `api` for an event emitted through the events API.
 - `id`: The event's id. Each run of this workflow starts from one event.
 - `received_at`: When Dagflows received the event, in RFC 3339.
-- `attributes`: Empty for a manual run. [Step 7](https://github.com/dagflows/examples/tree/main/07-webhook-and-schedule) shows what a webhook and a schedule add.
+- `attributes`: Empty for a manual run. [Step 7](https://github.com/dagflows/examples/tree/main/07-webhook) shows what a webhook adds.
 
 ## Run on Dagflows
 
