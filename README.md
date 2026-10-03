@@ -14,9 +14,7 @@ Every step is the previous one with one idea added, so start at step 1.
 | 3. [Several nodes](03-several-nodes) | A chain of typed nodes, each fed its parent's output | [python](03-several-nodes/python) | [go](03-several-nodes/go) | [node](03-several-nodes/node) (TypeScript) |
 | 4. [Two languages](04-two-languages) | One workflow across a Python and a Go project | [workspace](04-two-languages) | [workspace](04-two-languages) | |
 | 5. [Fan-out and join](05-fan-out-and-join) | Two branches in parallel, joined in one node, across three languages | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) |
-
-[order-pipeline](order-pipeline) is where the steps lead: six nodes in three languages,
-started by a trigger.
+| 6. [Trigger](06-trigger) | The orders arrive as a typed event that starts the run | [workspace](06-trigger) | [workspace](06-trigger) | [workspace](06-trigger) |
 
 ---
 
@@ -117,6 +115,9 @@ curl -sS "$API/api/v1/workflows/$WORKFLOW/runs/$RUN" \
 
 A run answered with `404` and "workflow version not found" means the deployment has not
 finished yet. Repeat the second command until `status` is `SUCCESS` or `FAILED`.
+
+From step 6 on, a workflow declares a trigger and its run carries a payload. The example's
+README gives the command that starts it.
 
 What a node prints goes to its log. Once a node has finished, its log is stored and the
 logs endpoint gives a link to it, a gzipped file with one JSON line per printed line:

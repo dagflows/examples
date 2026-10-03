@@ -1,3 +1,0 @@
-# SDK installed during manifest generation and runtime execution.
-# Pinned to ensure reproducible JSON Schema emission across builds.
-dagflows==0.5.0
