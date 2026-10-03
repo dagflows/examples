@@ -12,6 +12,7 @@ Every step is the previous one with one idea added, so start at step 1.
 | 1. [Your first node](01-first-node) | One node, no types, run by hand | [python](01-first-node/python) | [go](01-first-node/go) | [node](01-first-node/node) |
 | 2. [Typed node](02-typed-node) | The node's output declared as a type | [python](02-typed-node/python) | [go](02-typed-node/go) | [node](02-typed-node/node) (TypeScript) |
 | 3. [Several nodes](03-several-nodes) | A chain of typed nodes, each fed its parent's output | [python](03-several-nodes/python) | [go](03-several-nodes/go) | [node](03-several-nodes/node) (TypeScript) |
+| 4. [Two languages](04-two-languages) | One workflow across a Python and a Go project | [workspace](04-two-languages) | [workspace](04-two-languages) | |
 
 [order-pipeline](order-pipeline) is where the steps lead: six nodes in three languages,
 started by a trigger.

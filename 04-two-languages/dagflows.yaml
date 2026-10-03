@@ -1,0 +1,9 @@
+# A workspace of several projects, built and deployed as one workflow.
+v: 1
+
+# The project that owns the workflow's settings must declare this same name.
+workflow: order-pipeline
+
+projects:
+  - path: py-orders
+  - path: go-orders
