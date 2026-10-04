@@ -103,13 +103,13 @@ INFO report: 3 orders, 2 rejected, 43749 cents net of 1500 discount
 
 ## Integers Across Languages
 
-TypeScript has two numeric types. A `number` is reflected as a JSON number, which never satisfies an integer, so every field that Go's `int64` or Python's `int` reads is declared `bigint`, which is reflected as an int64 integer. If `score_risk` declared `order_id: number`, the deployment would fail with:
+A TypeScript `number` is reflected as a JSON number, which never satisfies an integer, so every field that Go's `int64` or Python's `int` reads is declared `Int`, imported from `@dagflows/sdk/runtime`. An `Int` is reflected as an int64 integer and is a plain `number` at run time, exact up to 2^53. If `score_risk` declared `order_id: number`, the deployment would fail with:
 
 ```
 node "apply_pricing" expects a RiskScores from "score_risk", but "score_risk" produces a RiskScores: scores[].order_id is a number, but integer is expected
 ```
 
-At run time, an integer within 2^53 arrives in TypeScript as a `number`, whatever its declared type. Comparing it with a `bigint` works either way, as the tier check in `enrich_customers` does. Before bigint arithmetic, convert it with `BigInt()`, as `score_risk` does.
+For an integer that can pass 2^53, declare a `bigint`, which is reflected as an int64 integer too. Such a value arrives as a `bigint` and a smaller one as a `number`, so convert it with `BigInt()` before bigint arithmetic.
 
 ## Run on Dagflows
 

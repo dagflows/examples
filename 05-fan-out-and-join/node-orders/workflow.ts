@@ -1,14 +1,14 @@
 import { Workflow } from "@dagflows/sdk/authoring";
-import type { Ctx } from "@dagflows/sdk/runtime";
+import type { Ctx, Int } from "@dagflows/sdk/runtime";
 
 // Interfaces are reflected into the manifest as JSON Schema, read from this source
-// by the typescript package when the manifest is built. A bigint is reflected as an
+// by the typescript package when the manifest is built. An Int is reflected as an
 // int64 integer, which the Python and Go integers on the other side of each edge need.
 // A number is a JSON number, which never satisfies an integer.
 interface Order {
-  id: bigint;
+  id: Int;
   customer_id: string;
-  amount_cents: bigint;
+  amount_cents: Int;
   currency: string;
 }
 
@@ -18,7 +18,7 @@ interface Orders {
 
 interface ValidatedOrders {
   orders: Order[];
-  rejected: bigint;
+  rejected: Int;
 }
 
 interface EnrichedOrder extends Order {
@@ -27,11 +27,11 @@ interface EnrichedOrder extends Order {
 
 interface EnrichedOrders {
   orders: EnrichedOrder[];
-  rejected: bigint;
+  rejected: Int;
 }
 
 interface RiskScores {
-  scores: { order_id: bigint; score: number }[];
+  scores: { order_id: Int; score: number }[];
 }
 
 // A project contributing nodes to a workflow another project owns uses an unnamed workflow.
@@ -48,7 +48,7 @@ export const enrichCustomers = wf.node(
   function enrichCustomers ({ ctx, input }: { ctx: Ctx; input: ValidatedOrders }): EnrichedOrders {
     const orders = input.orders.map((order) => ({
       ...order,
-      tier: order.amount_cents >= 10_000n ? "gold" : "standard",
+      tier: order.amount_cents >= 10_000 ? "gold" : "standard",
     }));
 
     ctx.log.info(`enriched ${orders.length} orders`);
@@ -60,13 +60,10 @@ export const enrichCustomers = wf.node(
 
 export const scoreRisk = wf.node(
   function scoreRisk ({ ctx, input }: { ctx: Ctx; input: Orders }): RiskScores {
-    const scores = input.orders.map((order) => {
-      // An integer within 2^53 arrives as a number whatever its declared type.
-      // BigInt() makes it the bigint it is declared as before bigint arithmetic.
-      const id = BigInt(order.id);
-
-      return { order_id: id, score: Number(id % 10n) / 10 };
-    });
+    const scores = input.orders.map((order) => ({
+      order_id: order.id,
+      score: (order.id % 10) / 10,
+    }));
 
     ctx.log.info(`scored ${scores.length} orders`);
 
