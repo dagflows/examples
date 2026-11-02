@@ -16,6 +16,7 @@ Every step is the previous one with one idea added, so start at step 1.
 | 5. [Fan-out and join](05-fan-out-and-join) | Two branches in parallel, joined in one node, across three languages | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) |
 | 6. [Trigger](06-trigger) | The orders arrive as a typed event that starts the run | [workspace](06-trigger) | [workspace](06-trigger) | [workspace](06-trigger) |
 | 7. [Webhook](07-webhook) | The same trigger bound to a webhook, started by a signed request | [workspace](07-webhook) | [workspace](07-webhook) | [workspace](07-webhook) |
+| 8. [Variables and secrets](08-variables-and-secrets) | A discount and a tier set on Dagflows, and the report signed with a secret key | [workspace](08-variables-and-secrets) | [workspace](08-variables-and-secrets) | [workspace](08-variables-and-secrets) |
 
 ---
 
