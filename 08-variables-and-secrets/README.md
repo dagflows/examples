@@ -86,14 +86,14 @@ Push this directory to your repository, with `dagflows.yaml` at its root, and cr
 # 1. The discount and the gold tier, plain variables of the workflow
 for pair in DISCOUNT_CENTS=500 GOLD_TIER_CENTS=10000; do
   jq -n --arg value "${pair#*=}" '{value: $value}' | curl -sS -X PUT "$API/api/v1/workflows/$WORKFLOW/variables/${pair%%=*}" \
-    -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
     --data-binary @- | jq -c '.data | {name, scope, secret, version}'
 done
 
 # 2. The signing key, a secret of the project
 REPORT_SIGNING_KEY=$(openssl rand -hex 32)
 jq -n --arg value "$REPORT_SIGNING_KEY" '{value: $value, secret: true}' | curl -sS -X PUT "$API/api/v1/projects/$PROJECT/variables/REPORT_SIGNING_KEY" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   --data-binary @- | jq -c '.data | {name, scope, secret, version}'
 ```
 
@@ -122,7 +122,7 @@ A node reads its variables when it starts, so a new value reaches the next run w
 
 ```bash
 jq -n '{value: "700"}' | curl -sS -X PUT "$API/api/v1/workflows/$WORKFLOW/variables/DISCOUNT_CENTS" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   --data-binary @- | jq -c '.data | {name, version}'
 ```
 

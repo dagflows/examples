@@ -62,7 +62,7 @@ Push this directory to your repository, with `dagflows.yaml` at its root, then d
 ```bash
 # 1. Bind a webhook to the trigger
 BINDING=$(curl -sS -X POST "$API/api/v1/workflows/$WORKFLOW/triggers" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   -d '{"trigger_key": "orders_received", "name": "Orders webhook", "webhook": {}}')
 HOOK=$(printf '%s' "$BINDING" | jq -r .data.source.url)
 SECRET=$(printf '%s' "$BINDING" | jq -r .data.secret)
@@ -76,7 +76,7 @@ EVENT=$(curl -sS -X POST "$HOOK" \
 
 # 3. Follow the event to its run
 curl -sS "$API/api/v1/events/$EVENT" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" \
   | jq '.data | {source_kind, attributes, deliveries: [.deliveries[] | {status, run_id}]}'
 ```
 

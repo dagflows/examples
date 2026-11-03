@@ -74,7 +74,7 @@ Then a project to keep the examples in:
 
 ```bash
 PROJECT=$(curl -sS -X POST "$API/api/v1/projects" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   -d '{"name": "Examples", "slug": "examples"}' | jq -r .data.id)
 ```
 
@@ -82,7 +82,7 @@ PROJECT=$(curl -sS -X POST "$API/api/v1/projects" \
 
 ```bash
 WORKFLOW=$(curl -sS -X POST "$API/api/v1/projects/$PROJECT/workflows" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   -d '{"name": "order-pipeline", "git_url": "https://github.com/YOUR-NAME/my-workflow", "git_branch": "main"}' \
   | jq -r .data.id)
 ```
@@ -93,11 +93,11 @@ A deployment clones the branch, builds the code and makes it the version that ru
 
 ```bash
 DEPLOYMENT=$(curl -sS -X POST "$API/api/v1/workflows/$WORKFLOW/deployments" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   -d '{}' | jq -r .data.id)
 
 curl -sS "$API/api/v1/workflows/$WORKFLOW/deployments/$DEPLOYMENT/progress" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" | jq '.data | {phase, pct, msg}'
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" | jq '.data | {phase, pct, msg}'
 ```
 
 Repeat the second command until `phase` is `DONE`. If it is `FAILED`, the build log says
@@ -108,10 +108,10 @@ while it builds and an `archive_url` once it has finished.
 
 ```bash
 RUN=$(curl -sS -X POST "$API/api/v1/workflows/$WORKFLOW/runs" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" | jq -r .data.id)
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" | jq -r .data.id)
 
 curl -sS "$API/api/v1/workflows/$WORKFLOW/runs/$RUN" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" \
   | jq '.data | {status, nodes: [.nodes[] | {node_key, status}]}'
 ```
 
@@ -126,7 +126,7 @@ logs endpoint gives a link to it, a gzipped file with one JSON line per printed 
 
 ```bash
 curl -sS "$API/api/v1/workflows/$WORKFLOW/runs/$RUN/logs" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" \
   | jq -r '.data.nodes[] | .archive[]?.url' \
   | while read -r url; do curl -sS "$url" | gunzip | jq -r .line; done
 ```

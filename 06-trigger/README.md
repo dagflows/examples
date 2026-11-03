@@ -118,11 +118,11 @@ The run takes `orders.json` as its payload, so start it with this command instea
 
 ```bash
 RUN=$(jq '{payload: .}' orders.json | curl -sS -X POST "$API/api/v1/workflows/$WORKFLOW/runs" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
   --data-binary @- | jq -r .data.id)
 
 curl -sS "$API/api/v1/workflows/$WORKFLOW/runs/$RUN" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Organization-Id: $ORG" | jq .data.trigger
+  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" | jq .data.trigger
 ```
 
 - `{payload: ...}`: The event. With one trigger declared, the run goes to it. A workflow with several names one with `"trigger_key"`.
