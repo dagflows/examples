@@ -1,6 +1,9 @@
 # Step 8: Variables and Secrets
 
-The workflow from step 7, with the values that change without a deploy, and a key that must stay out of the repository, kept on Dagflows instead of in the code. `apply_pricing` reads its discount and `enrich_customers` its gold tier from plain variables, and `build_report` signs the report with a secret key.
+The workflow from [step 7](../07-webhook), with some values moved out of the code and onto
+Dagflows. The discount and the amount from which an order is gold become variables, which you
+change without a deploy. And `build_report` signs the report with a key, a secret that never goes
+into the repository.
 
 ```
                orders_received (trigger)
@@ -16,120 +19,136 @@ The workflow from step 7, with the values that change without a deploy, and a ke
                     REPORT_SIGNING_KEY
 ```
 
-### What you'll learn
-- How to name the variables a node gets, in each language.
-- How to set them on a workflow and on a project.
-- How a secret differs from a plain variable.
-- How a new value reaches the next run without a deploy.
-
-## What's New
-
-Compared with [step 7](https://github.com/dagflows/examples/tree/main/07-webhook):
-
-- `apply_pricing` takes its discount from `DISCOUNT_CENTS`, and `enrich_customers` the amount from which an order is gold from `GOLD_TIER_CENTS`. Both are plain variables, values an operator changes without a deploy.
-- `build_report` signs the report with `REPORT_SIGNING_KEY`, a secret. Its output is the report and its signature, which whoever receives the report checks with the same key.
-- The code names the variables a node gets, and Dagflows holds their values, on the organization, a project or the workflow.
-
-## Files
+This folder is the whole example. Copy all of it:
 
 ```
-dagflows.yaml          workspace: the workflow name, its projects and the TypeScript entry module
+dagflows.yaml          the workspace: the workflow's name and its three projects
 orders.json            the five orders, a run's payload
-py-orders/
-  workflow.py          the workflow, the orders_received trigger, ingest_orders and build_report, which signs
-  requirements.txt     pinned Dagflows SDK dependency
-go-orders/
-  main.go              validate_orders and apply_pricing, which reads DISCOUNT_CENTS
-  go.mod               module declaration requiring the Dagflows SDK
-node-orders/
-  workflow.ts          enrich_customers, which reads GOLD_TIER_CENTS, and score_risk
-  package.json         project manifest depending on @dagflows/sdk, with typescript and @types/node for development
-  package-lock.json    pinned dependency tree (required for npm ci)
+py-orders/             Python: the trigger, ingest_orders and build_report, which signs
+go-orders/             Go: validate_orders and apply_pricing, which reads DISCOUNT_CENTS
+node-orders/           TypeScript: enrich_customers, which reads GOLD_TIER_CENTS, and score_risk
 ```
 
-## Code
+## The Code
 
-[py-orders/workflow.py](py-orders/workflow.py), [go-orders/main.go](go-orders/main.go) and [node-orders/workflow.ts](node-orders/workflow.ts) each name one variable on one node. A node gets the variables it names, as environment variables, and no others:
+A node names the variables it needs, and reads them from its environment when it runs. Dagflows
+holds their values and gives each node only the ones it names.
 
-| | Python | Go | TypeScript |
-|---|---|---|---|
-| One node's | `@wf.node(env=["NAME"])` | `df.NodeOptions{Env: []string{"NAME"}}` | `wf.node(fn, { env: ["NAME"] })` |
-| Every node's | `Workflow("name", env=["NAME"])` | `df.WorkflowOptions{Env: []string{"NAME"}}` | `new Workflow("name", { env: ["NAME"] })` |
-| Reading one | `os.environ["NAME"]` | `os.Getenv("NAME")` | `process.env.NAME` |
+**Go**, `apply_pricing` in [go-orders/main.go](go-orders/main.go):
 
-- Only the project that names the workflow can name variables for every node, so here each node names its own.
-- A variable is read inside the node. The build that emits the manifest runs the code with none.
-- A name is letters, digits and `_`, not starting with a digit. Names starting with `DAGFLOWS_` or `LD_`, and `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `PWD`, `SHELL` and `PYTHONUNBUFFERED`, are the platform's.
+```go
+discountCents, err := strconv.ParseInt(os.Getenv("DISCOUNT_CENTS"), 10, 64)
+if err != nil || discountCents < 0 {
+	return PricedOrders{}, fmt.Errorf("DISCOUNT_CENTS is %q, want a whole number of cents", os.Getenv("DISCOUNT_CENTS"))
+}
 
-## Run Locally
+// ...
 
-Locally nothing sets the variables, so export the values Dagflows would give the nodes, then run [step 6's commands](https://github.com/dagflows/examples/tree/main/06-trigger#run-locally) from this directory in the same shell:
-
-```bash
-export DISCOUNT_CENTS=500 GOLD_TIER_CENTS=10000 REPORT_SIGNING_KEY=$(openssl rand -hex 32)
+wf.Node(applyPricing, wf.External[RiskScores]("score_risk"),
+	df.NodeOptions{Key: "apply_pricing", Env: []string{"DISCOUNT_CENTS"}})
 ```
 
-A node started without its variable fails and names it, for example `DISCOUNT_CENTS is "", want a whole number of cents`. The last command now prints the report and its signature. Check the signature with the key:
+**TypeScript**, `enrich_customers` in [node-orders/workflow.ts](node-orders/workflow.ts):
 
-```bash
-jq -jcS .output.data.report /tmp/out.json | openssl dgst -sha256 -hmac "$REPORT_SIGNING_KEY" | awk '{print $NF}'
-jq -r .output.data.signature /tmp/out.json
+```ts
+const goldTier = process.env.GOLD_TIER_CENTS ?? "";
+
+// ...
+
+{ key: "enrich_customers", depends: [validateOrders], env: ["GOLD_TIER_CENTS"] },
 ```
 
-The two lines are the same. `-jcS` writes the report as `build_report` signed it, its keys sorted, without spaces or a final newline.
+**Python**, `build_report` in [py-orders/workflow.py](py-orders/workflow.py), signs the report:
 
-## Run on Dagflows
+```python
+@wf.node(depends=[enriched, priced], env=["REPORT_SIGNING_KEY"])
+def build_report(inputs: Inputs, ctx: Ctx) -> SignedReport:
+    # ...
+    key = os.environ.get("REPORT_SIGNING_KEY", "")
+    body = json.dumps(asdict(report), sort_keys=True, separators=(",", ":"))
+    signature = hmac.new(key.encode(), body.encode(), hashlib.sha256).hexdigest()
 
-Push this directory to your repository, with `dagflows.yaml` at its root, and create the workflow as shown in [Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows), steps 1 to 4. Then set the variables, before the deploy:
-
-```bash
-# 1. The discount and the gold tier, plain variables of the workflow
-for pair in DISCOUNT_CENTS=500 GOLD_TIER_CENTS=10000; do
-  jq -n --arg value "${pair#*=}" '{value: $value}' | curl -sS -X PUT "$API/api/v1/workflows/$WORKFLOW/variables/${pair%%=*}" \
-    -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
-    --data-binary @- | jq -c '.data | {name, scope, secret, version}'
-done
-
-# 2. The signing key, a secret of the project
-REPORT_SIGNING_KEY=$(openssl rand -hex 32)
-jq -n --arg value "$REPORT_SIGNING_KEY" '{value: $value, secret: true}' | curl -sS -X PUT "$API/api/v1/projects/$PROJECT/variables/REPORT_SIGNING_KEY" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
-  --data-binary @- | jq -c '.data | {name, scope, secret, version}'
+    return SignedReport(report=report, signature=signature)
 ```
 
-- A deploy fails if a node names a variable that neither the workflow, nor its project, nor its organization holds, and its progress says which node names which: `variables not set on the workflow, its project or its organization: node "apply_pricing" names DISCOUNT_CENTS`.
-- A node gets the workflow's own value of a name, else its project's, else its organization's. The key is set on the project, so every workflow of the project that names it signs with the same key. An organization's variables are set by its admins, under `$API/api/v1/organizations/$ORG/variables/NAME`.
-- `"secret": true`: The value is never shown again. `GET .../variables/REPORT_SIGNING_KEY` answers without it, while a plain variable's route gives its `value`. Both list, under `used_by`, the workflows whose running version names it and gets that value.
+- **`env` names a node's variables**: `env=[...]` in Python, `Env: []string{...}` in Go,
+  `env: [...]` in TypeScript. A node gets those, as environment variables, and no others.
+- **A variable is read inside the node**, while it runs. Dagflows builds the workflow without any.
+- **A value is set on the workflow, its project or its organization.** A node gets the workflow's
+  own value of a name, else its project's, else its organization's.
+- **A secret** is a variable whose value is never shown again once saved.
 
-Then deploy as the guide's step 5 shows, and start a run with the orders as in [step 6](https://github.com/dagflows/examples/tree/main/06-trigger#run-on-dagflows). Read the logs as the guide shows:
+## Deploy It
+
+Set the variables first: a deploy fails while a node names a variable that has no value, and says
+which, for example `node "apply_pricing" names DISCOUNT_CENTS`.
+
+1. **The two values, on the workflow.** Open the workflow's **Settings → ENVs & Secrets**. Under
+   **Environment Variables**, click **New variable** and add `DISCOUNT_CENTS` = `500`, then
+   `GOLD_TIER_CENTS` = `10000`:
+
+   ![The workflow's two variables](../images/08-variables.png)
+
+2. **The key, on the project.** Open the project's **Settings → ENVs & Secrets**. Under **Secrets**,
+   click **New secret** and add `REPORT_SIGNING_KEY` with a long random value, such as the output of
+   `openssl rand -hex 32`. Set on the project, the key signs for every workflow of the project that
+   names it.
+
+   ![The project's secret](../images/08-secret.png)
+
+3. **Deploy and run.** Follow [Deploy an Example on Dagflows](../README.md#deploy-an-example-on-dagflows)
+   with this whole folder, or replace your repository's files with it, push, and click **Deploy**.
+   Then run it with [orders.json](orders.json) as the payload, as in
+   [step 6](../06-trigger#deploy-it), or send the orders to the webhook of step 7.
+
+## What You'll See
+
+`enrich_customers` and `apply_pricing` log the values they were given, and `build_report` the
+report's signature:
+
+![The run with the variables and the signature in its logs](../images/08-run.png)
 
 ```
-INFO manual event <event_id> received at <received_at>
-INFO run <workflow_run_id>: ingested 5 orders
-time=<timestamp> level=INFO msg="validated orders" kept=3 rejected=2
+INFO manual event <event id> received at <time>
+INFO run <run id>: ingested 5 orders
+time=<time> level=INFO msg="validated orders" kept=3 rejected=2
 INFO enriched 3 orders, gold from 10000 cents node=enrich_customers
 INFO scored 5 orders node=score_risk
-time=<timestamp> level=INFO msg="priced orders" scored=5 discounted=3 discount_cents=500
+time=<time> level=INFO msg="priced orders" scored=5 discounted=3 discount_cents=500
 INFO report: 3 orders, 2 rejected, 43749 cents net of 1500 discount
 INFO signed the report: <signature>
 ```
 
-With the same key and orders, the signature is the one the local run printed.
+`build_report`'s output is the report and its signature. Whoever receives the report checks the
+signature with the same key.
 
-## Changing a Value
+### Change a Value Without a Deploy
 
-A node reads its variables when it starts, so a new value reaches the next run without a deploy:
+A node reads its variables when it starts, so a new value reaches the next run. On the workflow's
+**ENVs & Secrets**, set `DISCOUNT_CENTS` to `700` and run again. `apply_pricing` logs
+`discount_cents=700`, and the report reads `43149 cents net of 2100 discount`. A node already
+running keeps the values it started with.
+
+### Keep a Secret Secret
+
+- Wherever a node that gets a secret prints it, in its log or in an error, Dagflows replaces it with
+  `***`. A value shorter than 8 bytes is not replaced, since it would hide ordinary text.
+- That catches accidents only. A node can still print a secret in another form, so print none.
+- A secret is stored encrypted, and travels encrypted to the machine that runs the node.
+
+## Try It on Your Machine
+
+Locally, you set the variables yourself. From `go-orders`:
 
 ```bash
-jq -n '{value: "700"}' | curl -sS -X PUT "$API/api/v1/workflows/$WORKFLOW/variables/DISCOUNT_CENTS" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
-  --data-binary @- | jq -c '.data | {name, version}'
+DISCOUNT_CENTS=700 go run . dev run apply_pricing --input score_risk='{"scores": [{"order_id": 1001, "score": 0.1}, {"order_id": 1004, "score": 0.4}]}'
 ```
 
-Start another run. `apply_pricing` logs `discount_cents=700` and the report reads `43149 cents net of 2100 discount`. A node that is already running keeps the values it started with.
+Order 1001 gets the 700 cent discount. Without `DISCOUNT_CENTS`, the node fails and says what is
+missing: `DISCOUNT_CENTS is "", want a whole number of cents`.
 
-## Keeping a Secret
+## Where to Go From Here
 
-- A secret's value is masked as `***` wherever a node that gets it prints it, in its log lines and in a failure's message. A value shorter than 8 bytes is not masked, since it would hide ordinary text.
-- Masking catches accidents. A node can still print a secret encoded, so print none.
-- A secret is stored sealed, and travels sealed to the worker that runs the node.
+That is the whole series: typed nodes in three languages, joined into one workflow, started by a
+webhook and configured from Dagflows. From here, change the example into your own workflow, or start
+a new one from the step closest to what you need.

@@ -1,7 +1,8 @@
 # Step 5: Fan-Out and Join
 
-The workflow from step 4 grows a second branch in TypeScript and Go, and the two branches meet in `build_report`. Six nodes in three languages, one workspace. The workflow takes no trigger payload and is invoked manually.
-
+The workflow from [step 4](../04-two-languages) grows a second branch. `ingest_orders` now feeds
+two nodes, which start two branches that run side by side, and `build_report` waits for both and
+joins them. Six nodes in three languages:
 
 ```
                   ingest_orders (Python)
@@ -13,116 +14,124 @@ The workflow from step 4 grows a second branch in TypeScript and Go, and the two
                    build_report (Python)
 ```
 
-### What you'll learn
-- How one node's output fans out to several children.
-- How a node with several parents joins them with `inputs`.
-- How integers cross between TypeScript, Go and Python.
+- `enrich_customers` puts each valid order in a tier, gold from 10,000 cents.
+- `score_risk` scores every order, and `apply_pricing` discounts by 500 cents each order scored
+  below 0.34.
+- `build_report` reports the tiers, the discounts and the total after them.
 
-## What's New
-
-Compared with [step 4](https://github.com/dagflows/examples/tree/main/04-two-languages):
-
-- `node-orders`, a TypeScript project: `enrich_customers` puts each validated order in a tier (gold from 10,000 cents), and `score_risk` scores every ingested order.
-- `apply_pricing` in Go discounts every order scored below 0.34 by 500 cents.
-- `ingest_orders` feeds two children that do not depend on each other, so Dagflows can run the two branches at the same time, up to the workflow's concurrent node limit (10 by default).
-- `build_report` has two parents. It takes `inputs` and reads each parent through its typed handle, then reports tiers, discounts and the net total.
-
-## Files
+This folder is the whole example. Copy all of it:
 
 ```
-dagflows.yaml          workspace: the workflow name, its projects and the TypeScript entry module
-py-orders/
-  workflow.py          the workflow, ingest_orders and build_report
-  requirements.txt     pinned Dagflows SDK dependency
-go-orders/
-  main.go              validate_orders and apply_pricing
-  go.mod               module declaration requiring the Dagflows SDK
-node-orders/
-  workflow.ts          enrich_customers and score_risk
-  package.json         project manifest depending on @dagflows/sdk, with typescript for development
-  package-lock.json    pinned dependency tree (required for npm ci)
+dagflows.yaml          the workspace: the workflow's name and its three projects
+py-orders/             Python: ingest_orders and build_report
+go-orders/             Go: validate_orders and apply_pricing
+node-orders/           TypeScript: enrich_customers and score_risk
 ```
 
-## Code
+## The Code
 
-[py-orders/workflow.py](py-orders/workflow.py), [go-orders/main.go](go-orders/main.go) and [node-orders/workflow.ts](node-orders/workflow.ts) contain the complete workflow implementation.
+**Fan-out needs nothing new.** Two nodes name the same parent: `validate_orders` in Go as before,
+and `score_risk` in [node-orders/workflow.ts](node-orders/workflow.ts):
 
-## Run Locally
+```ts
+const ingestOrders = wf.externalNode<Orders>("ingest_orders");
 
-```bash
-# 1. Install the Python and TypeScript dependencies
-cd py-orders
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cd ../node-orders
-npm ci
-
-# 2. Run each node on its parents' outputs, branch by branch
-cd ../py-orders
-python -m dagflows dev fixture workflow:ingest_orders -o /tmp/fixture.json
-DAGFLOWS_INPUT=/tmp/fixture.json DAGFLOWS_OUTPUT=/tmp/out.json python -m dagflows invoke --node ingest_orders
-jq .output.data /tmp/out.json > /tmp/orders.json
-
-cd ../go-orders
-go run . dev run validate_orders --input ingest_orders=/tmp/orders.json --json | jq .result.output.data > /tmp/validated.json
-
-cd ../node-orders
-npx dagflows-sdk dev run workflow.ts:enrichCustomers --input validate_orders=/tmp/validated.json --json | jq .result.output.data > /tmp/enriched.json
-npx dagflows-sdk dev run workflow.ts:scoreRisk --input ingest_orders=/tmp/orders.json --json | jq .result.output.data > /tmp/scores.json
-
-cd ../go-orders
-go run . dev run apply_pricing --input score_risk=/tmp/scores.json --json | jq .result.output.data > /tmp/priced.json
-
-# 3. Join the two branches
-cd ../py-orders
-python -m dagflows dev fixture workflow:build_report --input enrich_customers=/tmp/enriched.json --input apply_pricing=/tmp/priced.json -o /tmp/fixture.json
-DAGFLOWS_INPUT=/tmp/fixture.json DAGFLOWS_OUTPUT=/tmp/out.json python -m dagflows invoke --node build_report
-jq .output.data /tmp/out.json
+export const scoreRisk = wf.node(
+  function scoreRisk({ ctx, input }: { ctx: Ctx; input: Orders }): RiskScores {
+    const scores = input.orders.map((order) => ({ order_id: order.id, score: (order.id % 10) / 10 }));
+    return { scores };
+  },
+  { key: "score_risk", depends: [ingestOrders] },
+);
 ```
 
-- `--input <parent>=<file>`: Hands a node one parent's output. `build_report` takes two, one per parent, as Dagflows hands it both branches during a run.
-- Orders 1001 to 1003 score below 0.34, so each gets the 500 cent discount, and 1002 (34,000 cents) is the one gold order:
+**A join names several parents.** `build_report`, in [py-orders/workflow.py](py-orders/workflow.py),
+depends on the last node of each branch. With more than one parent, it takes `inputs` and reads each
+parent through its handle:
 
-```
-INFO report: 3 orders, 2 rejected, 43749 cents net of 1500 discount
+```python
+enriched = wf.external_node("enrich_customers", EnrichedOrders)
+priced = wf.external_node("apply_pricing", PricedOrders)
+
+
+@wf.node(depends=[enriched, priced])
+def build_report(inputs: Inputs, ctx: Ctx) -> Report:
+    orders = inputs[enriched].value()
+    adjustments = inputs[priced].value()
+    ...
 ```
 
-```json
-{
-  "total_orders": 3,
-  "rejected": 2,
-  "gross_cents": 45249,
-  "discount_cents": 1500,
-  "net_cents": 43749,
-  "by_tier": {
-    "standard": 2,
-    "gold": 1
-  }
+**Integers in TypeScript are `Int`.** A TypeScript `number` may hold a fraction, so it never matches
+the integers Python's `int` and Go's `int64` declare. Every whole number that crosses to Python or
+Go is declared `Int`, a plain `number` at run time:
+
+```ts
+import type { Ctx, Int } from "@dagflows/sdk/runtime";
+
+interface Order {
+  id: Int;
+  customer_id: string;
+  amount_cents: Int;
+  currency: string;
 }
 ```
 
-## Integers Across Languages
-
-A TypeScript `number` is reflected as a JSON number, which never satisfies an integer, so every field that Go's `int64` or Python's `int` reads is declared `Int`, imported from `@dagflows/sdk/runtime`. An `Int` is reflected as an int64 integer and is a plain `number` at run time, exact up to 2^53. If `score_risk` declared `order_id: number`, the deployment would fail with:
+Had `score_risk` declared `order_id: number`, the build would fail with:
 
 ```
 node "apply_pricing" expects a RiskScores from "score_risk", but "score_risk" produces a RiskScores: scores[].order_id is a number, but integer is expected
 ```
 
-For an integer that can pass 2^53, declare a `bigint`, which is reflected as an int64 integer too. Such a value arrives as a `bigint` and a smaller one as a `number`, so convert it with `BigInt()` before bigint arithmetic.
+**[dagflows.yaml](dagflows.yaml)** lists the third project, and names its TypeScript entry:
 
-## Run on Dagflows
+```yaml
+  - path: node-orders
+    module: workflow.ts
+```
 
-Push this directory to your repository, with `dagflows.yaml` at its root, then deploy and trigger a run as shown in [Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows).
+## Deploy It
 
-The workflow requires no input payload. Dagflows builds the three projects, runs both branches from `ingest_orders`, and runs `build_report` once both have finished. Once execution completes, the run logs will show (the two branches may run in either order):
+Follow [Deploy an Example on Dagflows](../README.md#deploy-an-example-on-dagflows) with this whole
+folder, or replace your repository's files with it, push, and click **Deploy**. Dagflows builds the
+three projects in the same deploy. The run takes no payload.
+
+## What You'll See
+
+The run fans out after `ingest_orders` and joins at `build_report`. The two branches run at the same
+time as far as your plan allows, one node at a time on the Free plan, so their lines can come in
+either order:
+
+![The run with its two branches](../images/05-run.png)
 
 ```
-INFO run <workflow_run_id>: ingested 5 orders
-time=<timestamp> level=INFO msg="validated orders" kept=3 rejected=2
+INFO run <run id>: ingested 5 orders
+time=<time> level=INFO msg="validated orders" kept=3 rejected=2
 INFO enriched 3 orders node=enrich_customers
 INFO scored 5 orders node=score_risk
-time=<timestamp> level=INFO msg="priced orders" scored=5 discounted=3
+time=<time> level=INFO msg="priced orders" scored=5 discounted=3
 INFO report: 3 orders, 2 rejected, 43749 cents net of 1500 discount
 ```
+
+Orders 1001 to 1003 score below 0.34, so each takes the 500 cent discount, and 1002, at 34,000
+cents, is the one gold order.
+
+## Try It on Your Machine
+
+Run the new branch one node at a time. `score_risk`, from `node-orders`:
+
+```bash
+npm ci
+npx dagflows-sdk dev run workflow.ts:scoreRisk --input ingest_orders='{"orders": [{"id": 1001, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}, {"id": 1004, "customer_id": "c2", "amount_cents": 500, "currency": "eur"}]}'
+```
+
+Then `apply_pricing` on its scores, from `go-orders`:
+
+```bash
+go run . dev run apply_pricing --input score_risk='{"scores": [{"order_id": 1001, "score": 0.1}, {"order_id": 1004, "score": 0.4}]}'
+```
+
+It discounts order 1001, scored 0.1, by 500 cents, and leaves 1004, scored 0.4, as it is.
+
+## Next
+
+[Step 6](../06-trigger) takes the orders out of the code: they arrive with the run, as a typed event.

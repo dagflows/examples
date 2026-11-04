@@ -1,135 +1,112 @@
-# Dagflows examples
+# Dagflows Examples
 
-Each example is a complete project. Read it here, then copy its directory into your own
-repository to run it on Dagflows (see [Running an example](#running-an-example-on-dagflows)).
+These examples build one small order pipeline, a step at a time. Step 1 is a single node that
+returns five orders. By step 8 the pipeline runs six nodes across Python, Go and TypeScript, starts
+when a webhook delivers the orders, and signs its report with a secret key.
 
-## Building workflows, step by step
+Each step adds one idea to the step before it, so start at step 1.
 
-Every step is the previous one with one idea added, so start at step 1.
+| Step | What it adds | Languages |
+|---|---|---|
+| 1. [Your first node](01-first-node) | A workflow with one node, run by hand | Python, Go or Node |
+| 2. [Typed node](02-typed-node) | The node's output declared as a type | Python, Go or TypeScript |
+| 3. [Several nodes](03-several-nodes) | A chain of nodes, each fed its parent's output | Python, Go or TypeScript |
+| 4. [Two languages](04-two-languages) | One workflow across a Python and a Go project | Python and Go |
+| 5. [Fan-out and join](05-fan-out-and-join) | Two branches that run side by side and meet in one node | Python, Go and TypeScript |
+| 6. [Trigger](06-trigger) | The orders arrive as a typed event that starts the run | Python, Go and TypeScript |
+| 7. [Webhook](07-webhook) | The same trigger, started by a signed request from outside | Python, Go and TypeScript |
+| 8. [Variables and secrets](08-variables-and-secrets) | Values and a key kept on Dagflows instead of in the code | Python, Go and TypeScript |
 
-| Step | What it adds | Python | Go | Node |
-|---|---|---|---|---|
-| 1. [Your first node](01-first-node) | One node, no types, run by hand | [python](01-first-node/python) | [go](01-first-node/go) | [node](01-first-node/node) |
-| 2. [Typed node](02-typed-node) | The node's output declared as a type | [python](02-typed-node/python) | [go](02-typed-node/go) | [node](02-typed-node/node) (TypeScript) |
-| 3. [Several nodes](03-several-nodes) | A chain of typed nodes, each fed its parent's output | [python](03-several-nodes/python) | [go](03-several-nodes/go) | [node](03-several-nodes/node) (TypeScript) |
-| 4. [Two languages](04-two-languages) | One workflow across a Python and a Go project | [workspace](04-two-languages) | [workspace](04-two-languages) | |
-| 5. [Fan-out and join](05-fan-out-and-join) | Two branches in parallel, joined in one node, across three languages | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) | [workspace](05-fan-out-and-join) |
-| 6. [Trigger](06-trigger) | The orders arrive as a typed event that starts the run | [workspace](06-trigger) | [workspace](06-trigger) | [workspace](06-trigger) |
-| 7. [Webhook](07-webhook) | The same trigger bound to a webhook, started by a signed request | [workspace](07-webhook) | [workspace](07-webhook) | [workspace](07-webhook) |
-| 8. [Variables and secrets](08-variables-and-secrets) | A discount and a tier set on Dagflows, and the report signed with a secret key | [workspace](08-variables-and-secrets) | [workspace](08-variables-and-secrets) | [workspace](08-variables-and-secrets) |
+## A Few Words First
 
----
+- A **workflow** is your code: a set of **nodes**, functions that Dagflows runs for you in order.
+- A node's **output** is what it returns. Dagflows hands it to the nodes that depend on it.
+- To **deploy** is to have Dagflows build your repository into a **version** of the workflow.
+- A **run** is one execution of that version. Each node of a run has its own status, logs and
+  output.
 
-## Running an example on Dagflows
+## Deploy an Example on Dagflows
 
-Every example runs the same way. You need a Dagflows account with a verified email, and
-`git`, `curl` and `jq`. The commands use a POSIX shell.
+Every example deploys the same way. You need a GitHub account and a Dagflows account.
 
-### 1. Put the example in a repository of your own
+### 1. Sign Up
 
-Dagflows builds a workflow from the root of a git repository, so copy one example's
-directory, not this whole repository:
+Create an account at [app.dagflows.com](https://app.dagflows.com) and verify your email. Your
+account comes with an organization, where your projects live.
+
+### 2. Put the Example in a Repository
+
+Dagflows builds a workflow from the root of a git repository, so an example's folder becomes the
+root of a repository of your own. Create an empty repository on GitHub, then:
 
 ```bash
 git clone https://github.com/dagflows/examples.git
-cp -r examples/01-first-node/python my-workflow
+mkdir my-workflow
+cp -r examples/01-first-node/python/. my-workflow/
 cd my-workflow
 git init -b main
 git add .
-git commit -m "My first Dagflows workflow"
+git commit -m "Step 1"
 git remote add origin https://github.com/YOUR-NAME/my-workflow.git
 git push -u origin main
 ```
 
-A public repository is cloned as it is. A private one needs a git account connected to
-your Dagflows organization.
+Steps 1 to 3 have a folder per language, so copy the one you want (`python`, `go` or `node`). From
+step 4 on, an example's folder holds all of its projects, and the whole folder is copied.
 
-### 2. Log in
+A public repository builds as it is. To build a private one, connect GitHub first, in
+**Settings → Connected accounts → Connect GitHub**.
 
-```bash
-API=https://api.dagflows.com
-TOKEN=$(curl -sS -X POST "$API/api/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "you@example.com", "password": "your-password"}' | jq -r .data.token.access_token)
-```
+### 3. Create a Project
 
-The token expires. When a call answers `401`, log in again.
+In the sidebar, open **Projects** and click **New project**. Name it, for example `Examples`.
 
-### 3. Choose an organization and a project
+![The Create project dialog](images/new-project.png)
 
-```bash
-curl -sS "$API/api/v1/organizations" -H "Authorization: Bearer $TOKEN" | jq '.data[] | {id, name}'
-ORG=the-organization-id
-```
+### 4. Create the Workflow
 
-If you have no organization yet, create one:
+In the project, click **New workflow**. Name it `order-pipeline`, then point it at your repository:
+pick it from your GitHub repositories, or click **Enter a URL instead** and give its URL and the
+branch, `main`. Click **Create**.
 
-```bash
-ORG=$(curl -sS -X POST "$API/api/v1/organizations" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name": "My team", "slug": "my-team"}' | jq -r .data.id)
-```
+![The Create workflow dialog with the repository's URL and branch](images/new-workflow.png)
 
-Then a project to keep the examples in:
+### 5. Deploy It
 
-```bash
-PROJECT=$(curl -sS -X POST "$API/api/v1/projects" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
-  -d '{"name": "Examples", "slug": "examples"}' | jq -r .data.id)
-```
+On the workflow's page, click **Deploy**. Leave **Commit hash** empty, which builds the newest
+commit of the branch, and click **Deploy**.
 
-### 4. Create the workflow from your repository
+![The Deploy workflow dialog](images/deploy.png)
 
-```bash
-WORKFLOW=$(curl -sS -X POST "$API/api/v1/projects/$PROJECT/workflows" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
-  -d '{"name": "order-pipeline", "git_url": "https://github.com/YOUR-NAME/my-workflow", "git_branch": "main"}' \
-  | jq -r .data.id)
-```
+The **Builds** tab follows the build while Dagflows clones the repository, installs what each
+project needs and builds the nodes. Once it finishes, that build is the version that runs. If it
+fails, its log says why.
 
-### 5. Deploy it
+![A finished build on the Builds tab](images/build.png)
 
-A deployment clones the branch, builds the code and makes it the version that runs.
+### 6. Run It
 
-```bash
-DEPLOYMENT=$(curl -sS -X POST "$API/api/v1/workflows/$WORKFLOW/deployments" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" -H "Content-Type: application/json" \
-  -d '{}' | jq -r .data.id)
+On the **Runs** tab, click **Run**. Steps 1 to 5 take no payload, so leave the box empty and click
+**Run**. Steps 6 to 8 say what to send.
 
-curl -sS "$API/api/v1/workflows/$WORKFLOW/deployments/$DEPLOYMENT/progress" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" | jq '.data | {phase, pct, msg}'
-```
+![The Run workflow dialog](images/run.png)
 
-Repeat the second command until `phase` is `DONE`. If it is `FAILED`, the build log says
-why: `GET $API/api/v1/workflows/$WORKFLOW/deployments/$DEPLOYMENT/logs` holds its `lines`
-while it builds and an `archive_url` once it has finished.
+Open the run to follow it: each node, its status, its logs and its output.
 
-### 6. Run it and read what it logged
+![A finished run with its node, its log and its output](images/run-detail.png)
+
+### Moving On to the Next Step
+
+Keep the same repository and the same workflow for every step. Replace the repository's files with
+the next step's, push, and click **Deploy** again:
 
 ```bash
-RUN=$(curl -sS -X POST "$API/api/v1/workflows/$WORKFLOW/runs" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" | jq -r .data.id)
-
-curl -sS "$API/api/v1/workflows/$WORKFLOW/runs/$RUN" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" \
-  | jq '.data | {status, nodes: [.nodes[] | {node_key, status}]}'
+cd my-workflow
+git rm -rq .
+cp -r ../examples/02-typed-node/python/. .
+git add .
+git commit -m "Step 2"
+git push
 ```
 
-A run answered with `404` and "workflow version not found" means the deployment has not
-finished yet. Repeat the second command until `status` is `SUCCESS` or `FAILED`.
-
-From step 6 on, a workflow declares a trigger and its run carries a payload. The example's
-README gives the command that starts it.
-
-What a node prints goes to its log. Once a node has finished, its log is stored and the
-logs endpoint gives a link to it, a gzipped file with one JSON line per printed line:
-
-```bash
-curl -sS "$API/api/v1/workflows/$WORKFLOW/runs/$RUN/logs" \
-  -H "Authorization: Bearer $TOKEN" -H "Organization-Id: $ORG" \
-  | jq -r '.data.nodes[] | .archive[]?.url' \
-  | while read -r url; do curl -sS "$url" | gunzip | jq -r .line; done
-```
-
-While a node is still running, its lines come back in the same response instead, under
-`.data.nodes[].lines[].line`.
+This way the whole series fits the Free plan, which holds two workflows.

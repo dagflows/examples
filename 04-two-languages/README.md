@@ -1,103 +1,107 @@
 # Step 4: Two Languages
 
-The chain from step 3 split across two languages: `ingest_orders` and `build_report` stay in Python, and `validate_orders` moves to Go. A `dagflows.yaml` workspace builds both projects as one workflow. The workflow takes no trigger payload and is invoked manually.
+The chain from [step 3](../03-several-nodes), split across two languages: `ingest_orders` and
+`build_report` stay in Python, and `validate_orders` moves to Go. Dagflows builds both projects and
+runs them as one workflow, handing each node its parent's output whatever language produced it.
 
 ```
 ingest_orders (Python) → validate_orders (Go) → build_report (Python)
 ```
 
-### What you'll learn
-- How a `dagflows.yaml` workspace builds several projects as one workflow.
-- How a node depends on a node in another project, by its key.
-- How Dagflows checks the types on every edge between languages when it builds the workflow.
-
-## What's New
-
-Compared with step 3 in [Python](https://github.com/dagflows/examples/tree/main/03-several-nodes/python) and [Go](https://github.com/dagflows/examples/tree/main/03-several-nodes/go):
-
-- `dagflows.yaml` lists the two projects and names the workflow. Dagflows builds and deploys them together.
-- `py-orders` owns the workflow with a named `Workflow`, and `go-orders` contributes its node through an unnamed one.
-- A node in another project is named by its key: `wf.external_node("validate_orders")` in Python, `wf.External[Orders]("ingest_orders")` in Go. Node keys are unique across the workspace.
-- Each language declares its own types for an edge, and Dagflows checks that they agree (see [Types Across Languages](#types-across-languages)).
-
-## Files
+This folder is the whole example. Copy all of it:
 
 ```
-dagflows.yaml          workspace: the workflow name and its projects
-py-orders/
-  workflow.py          the workflow, ingest_orders and build_report
-  requirements.txt     pinned Dagflows SDK dependency
-go-orders/
-  main.go              validate_orders
-  go.mod               module declaration requiring the Dagflows SDK
+dagflows.yaml          the workspace: the workflow's name and its two projects
+py-orders/             Python: ingest_orders and build_report
+go-orders/             Go: validate_orders
 ```
 
-## Code
+## The Code
 
-[py-orders/workflow.py](py-orders/workflow.py) and [go-orders/main.go](go-orders/main.go) contain the complete workflow implementation.
+**[dagflows.yaml](dagflows.yaml)** makes the repository a workspace, several projects built as one
+workflow:
 
-## Run Locally
+```yaml
+v: 1
+
+workflow: order-pipeline
+
+projects:
+  - path: py-orders
+  - path: go-orders
+```
+
+**Python**, [py-orders/workflow.py](py-orders/workflow.py), owns the workflow, so it names it. Its
+`build_report` depends on a node of the Go project, named by its key:
+
+```python
+wf = Workflow("order-pipeline")
+
+
+@wf.node(depends=[wf.external_node("validate_orders")])
+def build_report(validated: ValidatedOrders, ctx: Ctx) -> Report:
+    ...
+```
+
+**Go**, [go-orders/main.go](go-orders/main.go), adds a node to that workflow, so its workflow has no
+name. Its `validate_orders` depends on `ingest_orders` in the Python project:
+
+```go
+wf := df.NewWorkflow("", df.WorkflowOptions{})
+
+wf.Node(validateOrders, wf.External[Orders]("ingest_orders"), df.NodeOptions{Key: "validate_orders"})
+```
+
+- **One project names the workflow**, and every other one adds its nodes without a name.
+- **A node of another project is named by its key**: `wf.external_node("validate_orders")` in
+  Python, `wf.External[Orders]("ingest_orders")` in Go. Keys are unique across the workspace.
+- **Each language declares the types it reads.** Python and Go both declare `Orders` and
+  `ValidatedOrders`. When Dagflows builds the workflow, it checks that both sides of every edge
+  agree. Had the Go `Order` declared `AmountCents string`, the build would fail with:
+
+  ```
+  node "build_report" expects a ValidatedOrders from "validate_orders", but "validate_orders" produces a ValidatedOrders: orders[].amount_cents is a string, but integer is expected
+  ```
+
+## Deploy It
+
+Follow [Deploy an Example on Dagflows](../README.md#deploy-an-example-on-dagflows) with this whole
+folder, so `dagflows.yaml` is at the root of the repository. Dagflows builds the Python and the Go
+project in the same deploy. The run takes no payload.
+
+## What You'll See
+
+The same three nodes as in step 3, the middle one in Go:
+
+![The run with its Python and Go nodes](../images/04-run.png)
+
+```
+INFO run <run id>: ingested 5 orders
+time=<time> level=INFO msg="validated orders" kept=3 rejected=2
+INFO report: 3 orders, 2 rejected, 45249 cents gross
+```
+
+## Try It on Your Machine
+
+Each project runs on its own, and you hand its node what the other project's node would. The Go
+node, from `go-orders`:
 
 ```bash
-# 1. Build each project's manifest and print the nodes it needs from the other project
-cd py-orders
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+go run . dev run validate_orders --input ingest_orders='{"orders": [{"id": 1, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}, {"id": 2, "customer_id": "c2", "amount_cents": 500, "currency": "eur"}]}'
+```
+
+Then the Python node on what Go returned, from `py-orders`:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m dagflows build manifest workflow -o dagflows-manifest.json
-jq '.nodes[] | {key, external_depends}' dagflows-manifest.json
-
-cd ../go-orders
-go run . build manifest -o dagflows-manifest.json
-jq '.nodes[] | {key, external_depends}' dagflows-manifest.json
-
-# 2. Run each node on its parent's output, across the two languages
-cd ../py-orders
-python -m dagflows dev fixture workflow:ingest_orders -o /tmp/fixture.json
-DAGFLOWS_INPUT=/tmp/fixture.json DAGFLOWS_OUTPUT=/tmp/out.json python -m dagflows invoke --node ingest_orders
-jq .output.data /tmp/out.json > /tmp/orders.json
-
-cd ../go-orders
-go run . dev run validate_orders --input ingest_orders=/tmp/orders.json --json | jq .result.output.data > /tmp/validated.json
-
-cd ../py-orders
-python -m dagflows dev fixture workflow:build_report --input validate_orders=/tmp/validated.json -o /tmp/fixture.json
-DAGFLOWS_INPUT=/tmp/fixture.json DAGFLOWS_OUTPUT=/tmp/out.json python -m dagflows invoke --node build_report
-jq .output.data /tmp/out.json
+python -m dagflows dev fixture workflow:build_report -o fixture.json --input validate_orders='{"orders": [{"id": 1, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}], "rejected": 1}'
+DAGFLOWS_INPUT=fixture.json DAGFLOWS_OUTPUT=out.json python -m dagflows invoke --node build_report
 ```
 
-- `build manifest`: Each project's manifest lists the node it needs from the other project under `external_depends`: `build_report` needs `validate_orders`, and `validate_orders` needs `ingest_orders`.
-- `--input <parent>=<file>`: Hands each node its parent's output, whichever language produced it. The report is the same as in step 3:
+It logs `INFO report: 1 orders, 1 rejected, 1250 cents gross`.
 
-```
-INFO run local: ingested 5 orders
-INFO report: 3 orders, 2 rejected, 45249 cents gross
-```
+## Next
 
-```json
-{
-  "total_orders": 3,
-  "rejected": 2,
-  "gross_cents": 45249
-}
-```
-
-## Types Across Languages
-
-Python and Go each declare the types of the edges they read. When Dagflows builds the workflow it compares every node's input schema with its parent's output schema, across projects and languages. If the Go `Order` struct declared `AmountCents string`, the deployment would fail with:
-
-```
-node "build_report" expects a ValidatedOrders from "validate_orders", but "validate_orders" produces a ValidatedOrders: orders[].amount_cents is a string, but integer is expected
-```
-
-## Run on Dagflows
-
-Push this directory to your repository, with `dagflows.yaml` at its root, then deploy and trigger a run as shown in [Running an example](https://github.com/dagflows/examples#running-an-example-on-dagflows).
-
-The workflow requires no input payload. Dagflows builds both projects, then runs the three nodes in order, passing each output to the next. Once execution completes, the run logs will show:
-
-```
-INFO run <workflow_run_id>: ingested 5 orders
-time=<timestamp> level=INFO msg="validated orders" kept=3 rejected=2
-INFO report: 3 orders, 2 rejected, 45249 cents gross
-```
+[Step 5](../05-fan-out-and-join) adds a second branch in TypeScript and Go, which runs beside the
+first and meets it in `build_report`.
