@@ -94,8 +94,7 @@ Locally, the event is handed to `ingest_orders` like a parent's output, by the t
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m dagflows dev fixture workflow:ingest_orders -o fixture.json --input orders_received=../orders.json
-DAGFLOWS_INPUT=fixture.json DAGFLOWS_OUTPUT=out.json python -m dagflows invoke --node ingest_orders
+python -m dagflows dev run workflow:ingest_orders --input orders_received=../orders.json
 ```
 
 It logs `INFO run local: ingested 5 orders`. Nothing started the run locally, so `ctx.trigger` is

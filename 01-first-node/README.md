@@ -115,12 +115,8 @@ You can run the node on your own machine, without Dagflows.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m dagflows dev fixture workflow:ingest_orders -o fixture.json
-DAGFLOWS_INPUT=fixture.json DAGFLOWS_OUTPUT=out.json python -m dagflows invoke --node ingest_orders
+python -m dagflows dev run workflow:ingest_orders
 ```
-
-`dev fixture` writes the input Dagflows would hand the node, and `invoke` runs the node on it. It
-logs `INFO run local: ingested 5 orders` and writes the output to `out.json`.
 
 **Go**, 1.27 or newer:
 
@@ -135,7 +131,8 @@ npm ci
 npx dagflows-sdk dev run workflow.js:ingestOrders
 ```
 
-Go and Node print the log line and the output.
+All three print the node's log line and its output. Each names the node in its own way: Python by
+its module and function, `workflow:ingest_orders`, Go by its key, and Node by its file and export.
 
 ## Next
 

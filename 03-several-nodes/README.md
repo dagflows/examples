@@ -116,8 +116,7 @@ one it keeps and one in euros it rejects:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m dagflows dev fixture workflow:validate_orders -o fixture.json --input ingest_orders='{"orders": [{"id": 1, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}, {"id": 2, "customer_id": "c2", "amount_cents": 500, "currency": "eur"}]}'
-DAGFLOWS_INPUT=fixture.json DAGFLOWS_OUTPUT=out.json python -m dagflows invoke --node validate_orders
+python -m dagflows dev run workflow:validate_orders --input ingest_orders='{"orders": [{"id": 1, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}, {"id": 2, "customer_id": "c2", "amount_cents": 500, "currency": "eur"}]}'
 ```
 
 **Go**:

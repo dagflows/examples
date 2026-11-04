@@ -95,8 +95,7 @@ Then the Python node on what Go returned, from `py-orders`:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m dagflows dev fixture workflow:build_report -o fixture.json --input validate_orders='{"orders": [{"id": 1, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}], "rejected": 1}'
-DAGFLOWS_INPUT=fixture.json DAGFLOWS_OUTPUT=out.json python -m dagflows invoke --node build_report
+python -m dagflows dev run workflow:build_report --input validate_orders='{"orders": [{"id": 1, "customer_id": "c1", "amount_cents": 1250, "currency": "usd"}], "rejected": 1}'
 ```
 
 It logs `INFO report: 1 orders, 1 rejected, 1250 cents gross`.
