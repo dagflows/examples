@@ -1,1 +1,1 @@
-dagflows==0.7.0
+dagflows==0.7.1

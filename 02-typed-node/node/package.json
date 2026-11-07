@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@dagflows/sdk": "0.8.0"
+    "@dagflows/sdk": "0.8.1"
   },
   "devDependencies": {
     "typescript": "^5.7.2"
